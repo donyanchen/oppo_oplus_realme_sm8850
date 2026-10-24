@@ -261,14 +261,22 @@ jobs:
             echo 'CONFIG_KSU_FULL_NAME_FORMAT="%TAG_NAME%-%COMMIT_SHA%@cctv18"' >> ./common/arch/arm64/configs/gki_defconfig
             # 内建 KPM 支持（SukiSU/BakaSU 的 KPM 只有内建模式才可用）
             echo 'CONFIG_KPM=y' >> ./common/arch/arm64/configs/gki_defconfig
-            # SukiSU 的 uapi/ 不会随 setup.sh 拷贝，KPM 需要 uapi/extension.h
-            for KU in KernelSU KernelSU-Ultra; do
-              if [ -d "$KU/uapi" ]; then
-                mkdir -p ../common/drivers/kernelsu/uapi
-                cp -f "$KU"/uapi/*.h ../common/drivers/kernelsu/uapi/ 2>/dev/null || true
-                echo "uapi headers copied from $KU"
-              fi
-            done
+            # SukiSU 的 uapi/ 不会随 setup.sh 拷贝，KPM/core 都需要
+            UAPI_SRC=$(find . -maxdepth 3 -type d -name uapi 2>/dev/null | head -1)
+            echo "uapi source: $UAPI_SRC"
+            if [ -n "$UAPI_SRC" ]; then
+              mkdir -p ./common/drivers/kernelsu/uapi
+              cp -f "$UAPI_SRC"/*.h ./common/drivers/kernelsu/uapi/ 2>/dev/null || true
+              ls ./common/drivers/kernelsu/uapi/ | head
+            fi
+
+            # === 版本伪装：显示官方长串，vermagic 保持短串 ===
+            DISP='6.12.69-android16-6-g43b5ab7e247d-abogki561813157-4k'
+            sed -i "s|\"Linux version \" UTS_RELEASE|\"Linux version \" \"$DISP\"|" ./common/init/version.c 2>/dev/null || true
+            sed -i "s|release = UTS_RELEASE;|release = \"$DISP\";|" ./common/init/utsname.c 2>/dev/null || true
+            echo "KBUILD_BUILD_USER=kleaf" >> $GITHUB_ENV
+            echo "KBUILD_BUILD_HOST=build-host" >> $GITHUB_ENV
+            echo "KBUILD_BUILD_TIMESTAMP=2026-09-08 15:08:49 UTC" >> $GITHUB_ENV
             echo 'CONFIG_KALLSYMS_ALL=y' >> ./common/arch/arm64/configs/gki_defconfig
             cd ./KernelSU-Ultra 2>/dev/null || cd ./KernelSU
             # 生成自定义版本号（基于提交计数）, 失败时使用 114514
